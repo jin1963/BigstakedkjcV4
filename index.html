@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Big KJC Stake V4</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<script src="https://cdn.jsdelivr.net/npm/web3@1.10.4/dist/web3.min.js"></script>
+<script src="config.js"></script>
+<script src="abi.js"></script>
+
+<style>
+
+body{
+background:#050505;
+color:#FFD700;
+font-family:Arial;
+margin:0;
+padding:20px;
+}
+
+.card{
+border:2px solid #b59619;
+border-radius:20px;
+padding:20px;
+margin-bottom:20px;
+background:#0b0b0b;
+}
+
+h1,h2{
+text-align:center;
+}
+
+.btn{
+width:100%;
+padding:15px;
+font-size:20px;
+background:#FFD700;
+border:none;
+border-radius:12px;
+cursor:pointer;
+}
+
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+}
+
+.box{
+border:1px solid #7c6a14;
+padding:10px;
+border-radius:10px;
+text-align:center;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>Big KJC Stake V4</h1>
+
+<div id="wallet">❌ Wallet not connected</div>
+
+<button id="connectBtn" class="btn">Connect Wallet</button>
+
+</div>
+
+
+<div class="card">
+
+<h2>Dashboard</h2>
+
+<div class="grid">
+
+<div class="box">
+Detected Token
+<div id="tokenName">-</div>
+</div>
+
+<div class="box">
+Wallet Balance
+<div id="balance">-</div>
+</div>
+
+<div class="box">
+Allowance
+<div id="allowance">-</div>
+</div>
+
+<div class="box">
+Total Your Stakes
+<div id="stakeCount">0</div>
+</div>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Auto Stake MAX</h2>
+
+<button id="approveBtn" class="btn">Approve</button>
+<br><br>
+<button id="stakeBtn" class="btn">Stake MAX</button>
+
+</div>
+
+
+<div class="card">
+
+<h2>Your Stakes</h2>
+
+<div id="stakes">Connect wallet first</div>
+
+</div>
+
+
+<script>
+
+let web3;
+let account;
+
+let staking;
+let oldToken;
+let newToken;
+
+function pickProvider(){
+
+if(window.bitkeep?.ethereum) return window.bitkeep.ethereum;
+
+if(window.ethereum) return window.ethereum;
+
+return null;
+
+}
+
+
+
+async function connectWallet(){
+
+try{
+
+const provider=pickProvider();
+
+if(!provider){
+alert("No wallet found");
+return;
+}
+
+await provider.request({method:"eth_requestAccounts"});
+
+web3=new Web3(provider);
+
+const accounts=await web3.eth.getAccounts();
+
+account=accounts[0];
+
+document.getElementById("wallet").innerHTML="✅ Connected<br>"+account;
+
+staking=new web3.eth.Contract(stakingABI,contractAddress);
+oldToken=new web3.eth.Contract(erc20ABI,oldTokenAddress);
+newToken=new web3.eth.Contract(erc20ABI,newTokenAddress);
+
+loadData();
+
+}catch(e){
+
+console.log(e);
+alert("Connect failed");
+
+}
+
+}
+
+
+
+async function loadData(){
+
+try{
+
+const balNew=await newToken.methods.balanceOf(account).call();
+const balOld=await oldToken.methods.balanceOf(account).call();
+
+let token;
+let balance;
+
+if(Number(balNew)>0){
+
+token=newToken;
+balance=balNew;
+document.getElementById("tokenName").innerText="KJC NEW";
+
+}else{
+
+token=oldToken;
+balance=balOld;
+document.getElementById("tokenName").innerText="KJC OLD";
+
+}
+
+document.getElementById("balance").innerText=web3.utils.fromWei(balance);
+
+const allowance=await token.methods.allowance(account,contractAddress).call();
+
+document.getElementById("allowance").innerText=web3.utils.fromWei(allowance);
+
+const newCount=await staking.methods.getStakeCountNew(account).call();
+const oldCount=await staking.methods.getStakeCountOld(account).call();
+
+document.getElementById("stakeCount").innerText=Number(newCount)+Number(oldCount);
+
+loadStakes();
+
+}catch(e){
+
+console.log(e);
+
+}
+
+}
+
+
+
+async function approve(){
+
+try{
+
+const balNew=await newToken.methods.balanceOf(account).call();
+const balOld=await oldToken.methods.balanceOf(account).call();
+
+let token;
+
+if(Number(balNew)>0){
+
+token=newToken;
+
+}else{
+
+token=oldToken;
+
+}
+
+await token.methods.approve(contractAddress,web3.utils.toWei("1000000000")).send({from:account});
+
+alert("Approve success");
+
+loadData();
+
+}catch(e){
+
+console.log(e);
+
+}
+
+}
+
+
+
+async function stake(){
+
+try{
+
+const balNew=await newToken.methods.balanceOf(account).call();
+const balOld=await oldToken.methods.balanceOf(account).call();
+
+let token;
+let method;
+let balance;
+
+if(Number(balNew)>0){
+
+token=newToken;
+method="stakeNew";
+balance=balNew;
+
+}else{
+
+token=oldToken;
+method="stakeOld";
+balance=balOld;
+
+}
+
+await staking.methods[method](balance).send({from:account});
+
+alert("Stake success");
+
+loadData();
+
+}catch(e){
+
+console.log(e);
+
+}
+
+}
+
+
+
+async function loadStakes(){
+
+try{
+
+let html="";
+
+const newCount=await staking.methods.getStakeCountNew(account).call();
+
+for(let i=0;i<newCount;i++){
+
+const s=await staking.methods.stakesNew(account,i).call();
+
+html+=`
+<div class="box">
+NEW Stake ${i}<br>
+Amount: ${web3.utils.fromWei(s.amount)} KJC
+</div>
+`;
+
+}
+
+const oldCount=await staking.methods.getStakeCountOld(account).call();
+
+for(let i=0;i<oldCount;i++){
+
+const s=await staking.methods.stakesOld(account,i).call();
+
+html+=`
+<div class="box">
+OLD Stake ${i}<br>
+Amount: ${web3.utils.fromWei(s.amount)} KJC
+</div>
+`;
+
+}
+
+document.getElementById("stakes").innerHTML=html||"No stake";
+
+}catch(e){
+
+console.log(e);
+
+}
+
+}
+
+
+
+document.getElementById("connectBtn").onclick=connectWallet;
+document.getElementById("approveBtn").onclick=approve;
+document.getElementById("stakeBtn").onclick=stake;
+
+</script>
+
+</body>
+</html>
