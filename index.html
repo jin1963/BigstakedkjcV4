@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Big KJC Stake V4</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #050505;
+      color: #ffd700;
+      font-family: Arial, sans-serif;
+      padding: 18px 12px 40px;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #0d0d0d;
+      border: 2px solid #8f6f10;
+      border-radius: 22px;
+      padding: 20px 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 18px rgba(255,215,0,0.08);
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 14px;
+      text-align: center;
+      color: #ffd700;
+      line-height: 1.2;
+    }
+
+    h1 { font-size: 38px; }
+    h2 { font-size: 28px; }
+    h3 { font-size: 24px; }
+
+    .wallet-box,
+    .line,
+    .stake-box,
+    .grid-box {
+      font-size: 21px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .wallet-box,
+    .line {
+      text-align: center;
+      margin: 8px 0;
+    }
+
+    .good { color: #92ff92; }
+    .bad { color: #ff7d7d; }
+
+    .btn {
+      width: 100%;
+      min-height: 58px;
+      border: none;
+      border-radius: 15px;
+      background: #ffd700;
+      color: #111;
+      font-size: 22px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .dash {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .grid-box {
+      background: #151515;
+      border: 1px solid #6f5710;
+      border-radius: 16px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .dash-title {
+      color: #cfb85b;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    .dash-value {
+      font-size: 23px;
+      font-weight: 700;
+    }
+
+    .stake-box {
+      background: #151515;
+      border: 1px solid #6f5710;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .stake-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .sub {
+      font-size: 17px;
+      text-align: center;
+      color: #d4bd62;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 640px) {
+      h1 { font-size: 32px; }
+      h2 { font-size: 25px; }
+      h3 { font-size: 22px; }
+      .wallet-box, .line, .stake-box, .grid-box { font-size: 18px; }
+      .dash { grid-template-columns: 1fr 1fr; }
+      .btn-row { grid-template-columns: 1fr; }
+      .btn { font-size: 20px; }
+      .dash-value { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="card">
+      <h1>Big KJC Stake V4</h1>
+      <div id="wallet" class="wallet-box bad">❌ Wallet not connected</div>
+      <button id="connectBtn" class="btn">Connect Wallet</button>
+    </div>
+
+    <div class="card">
+      <h2>Dashboard</h2>
+      <div class="dash">
+        <div class="grid-box">
+          <div class="dash-title">Detected Token</div>
+          <div id="tokenName" class="dash-value">-</div>
+        </div>
+        <div class="grid-box">
+          <div class="dash-title">Wallet Balance</div>
+          <div id="walletBalance" class="dash-value">-</div>
+        </div>
+        <div class="grid-box">
+          <div class="dash-title">Allowance</div>
+          <div id="walletAllowance" class="dash-value">-</div>
+        </div>
+        <div class="grid-box">
+          <div class="dash-title">Total Your Stakes</div>
+          <div id="stakeCount" class="dash-value">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Auto Stake MAX</h2>
+      <div id="token" class="line">Token : -</div>
+      <div id="balance" class="line">Balance : -</div>
+      <div id="allowance" class="line">Allowance : -</div>
+      <div class="sub">ระบบจะเลือก KJC ใหม่ก่อน ถ้าไม่มีค่อยใช้ KJC เก่า</div>
+
+      <div class="btn-row">
+        <button id="approveBtn" class="btn">Approve</button>
+        <button id="stakeBtn" class="btn">Stake MAX</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Your Stakes</h3>
+      <div id="stakes">Connect wallet first</div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.4/dist/web3.min.js"></script>
+  <script src="config.js"></script>
+  <script src="abi.js"></script>
+
+  <script>
+    let web3;
+    let account = null;
+    let provider = null;
+
+    let staking;
+    let oldToken;
+    let newToken;
+
+    function pickProvider() {
+      const bitkeep = window.bitkeep?.ethereum || window.bitkeep || null;
+      const eth = window.ethereum || null;
+
+      if (bitkeep?.request) return bitkeep;
+
+      if (eth?.providers && Array.isArray(eth.providers)) {
+        const bitgetProvider = eth.providers.find(
+          (p) => p?.isBitKeep || p?.isBitgetWallet || p?.isBitget
+        );
+        if (bitgetProvider?.request) return bitgetProvider;
+
+        const metaMaskProvider = eth.providers.find((p) => p?.isMetaMask);
+        if (metaMaskProvider?.request) return metaMaskProvider;
+      }
+
+      if (eth?.request) return eth;
+      return null;
+    }
+
+    async function ensureChain() {
+      if (!provider?.request) throw new Error("No provider");
+
+      const targetHex = "0x" + Number(chainId).toString(16);
+      const currentChainId = await provider.request({ method: "eth_chainId" });
+
+      if (String(currentChainId).toLowerCase() === targetHex.toLowerCase()) return;
+
+      try {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: targetHex }]
+        });
+      } catch (e) {
+        if (e?.code === 4902) {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: targetHex,
+              chainName: "BNB Smart Chain",
+              nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+              rpcUrls: ["https://bsc-dataseed.binance.org/"],
+              blockExplorerUrls: ["https://bscscan.com/"]
+            }]
+          });
+
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: targetHex }]
+          });
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    async function initContracts() {
+      web3 = new Web3(provider);
+      staking = new web3.eth.Contract(stakingABI, contractAddress);
+      oldToken = new web3.eth.Contract(erc20ABI, oldTokenAddress);
+      newToken = new web3.eth.Contract(erc20ABI, newTokenAddress);
+    }
+
+    function setWallet(text, ok = false) {
+      const el = document.getElementById("wallet");
+      el.innerHTML = text;
+      el.className = ok ? "wallet-box good" : "wallet-box bad";
+    }
+
+    function formatAmount(raw) {
+      try {
+        return Number(web3.utils.fromWei(String(raw), "ether")).toFixed(4);
+      } catch {
+        return "0.0000";
+      }
+    }
+
+    async function getWalletState() {
+      const [balNew, balOld] = await Promise.all([
+        newToken.methods.balanceOf(account).call(),
+        oldToken.methods.balanceOf(account).call()
+      ]);
+
+      const bnNew = web3.utils.toBN(balNew);
+      const bnOld = web3.utils.toBN(balOld);
+
+      if (bnNew.gt(web3.utils.toBN("0"))) {
+        const allowance = await newToken.methods.allowance(account, contractAddress).call();
+        return {
+          label: "KJC NEW",
+          token: newToken,
+          balance: balNew,
+          allowance,
+          method: "stakeNew"
+        };
+      }
+
+      if (bnOld.gt(web3.utils.toBN("0"))) {
+        const allowance = await oldToken.methods.allowance(account, contractAddress).call();
+        return {
+          label: "KJC OLD",
+          token: oldToken,
+          balance: balOld,
+          allowance,
+          method: "stakeOld"
+        };
+      }
+
+      return {
+        label: "No KJC",
+        token: null,
+        balance: "0",
+        allowance: "0",
+        method: null
+      };
+    }
+
+    async function connectWallet() {
+      try {
+        provider = pickProvider();
+        if (!provider?.request) {
+          alert("No wallet found");
+          return;
+        }
+
+        document.getElementById("connectBtn").innerText = "Connecting...";
+
+        await provider.request({ method: "eth_requestAccounts" });
+        await ensureChain();
+        await initContracts();
+
+        const accounts = await web3.eth.getAccounts();
+        if (!accounts?.length) throw new Error("No account");
+        account = accounts[0];
+
+        setWallet("✅ Connected<br>" + account, true);
+        document.getElementById("connectBtn").innerText = "Connect Wallet";
+
+        await loadData();
+      } catch (e) {
+        console.error("connectWallet error:", e);
+        alert("Connect failed: " + (e?.message || e));
+        document.getElementById("connectBtn").innerText = "Connect Wallet";
+      }
+    }
+
+    async function loadData() {
+      try {
+        if (!account) {
+          document.getElementById("stakes").innerHTML = "Connect wallet first";
+          return;
+        }
+
+        const state = await getWalletState();
+
+        document.getElementById("tokenName").innerText = state.label;
+        document.getElementById("walletBalance").innerText = formatAmount(state.balance);
+        document.getElementById("walletAllowance").innerText = formatAmount(state.allowance);
+        document.getElementById("token").innerText = "Token : " + (state.label === "No KJC" ? "ไม่พบ KJC" : state.label);
+        document.getElementById("balance").innerText = "Balance : " + formatAmount(state.balance);
+        document.getElementById("allowance").innerText = "Allowance : " + formatAmount(state.allowance);
+
+        const [newCountRaw, oldCountRaw] = await Promise.all([
+          staking.methods.getStakeCountNew(account).call(),
+          staking.methods.getStakeCountOld(account).call()
+        ]);
+
+        const newCount = Number(newCountRaw);
+        const oldCount = Number(oldCountRaw);
+
+        document.getElementById("stakeCount").innerText = String(newCount + oldCount);
+
+        await loadStakes(newCount, oldCount);
+      } catch (e) {
+        console.error("loadData error:", e);
+        document.getElementById("stakes").innerHTML = "Load failed";
+      }
+    }
+
+    async function approve() {
+      try {
+        if (!account) {
+          alert("Connect wallet first");
+          return;
+        }
+
+        const state = await getWalletState();
+        if (!state.token) {
+          alert("No KJC found");
+          return;
+        }
+
+        document.getElementById("approveBtn").innerText = "Approving...";
+
+        await state.token.methods
+          .approve(contractAddress, state.balance)
+          .send({ from: account });
+
+        alert("Approve success");
+        document.getElementById("approveBtn").innerText = "Approve";
+        await loadData();
+      } catch (e) {
+        console.error("approve error:", e);
+        alert("Approve failed: " + (e?.message || e));
+        document.getElementById("approveBtn").innerText = "Approve";
+      }
+    }
+
+    async function stake() {
+      try {
+        if (!account) {
+          alert("Connect wallet first");
+          return;
+        }
+
+        const state = await getWalletState();
+        if (!state.token || !state.method) {
+          alert("No KJC found");
+          return;
+        }
+
+        document.getElementById("stakeBtn").innerText = "Staking...";
+
+        await staking.methods[state.method](state.balance).send({ from: account });
+
+        alert("Stake success");
+        document.getElementById("stakeBtn").innerText = "Stake MAX";
+        await loadData();
+      } catch (e) {
+        console.error("stake error:", e);
+        alert("Stake failed: " + (e?.message || e));
+        document.getElementById("stakeBtn").innerText = "Stake MAX";
+      }
+    }
+
+    async function loadStakes(newCount, oldCount) {
+      let html = "";
+
+      for (let i = 0; i < newCount; i++) {
+        const s = await staking.methods.stakesNew(account, i).call();
+        html += `
+          <div class="stake-box">
+            <div class="stake-title">NEW Stake ${i}</div>
+            Amount: ${formatAmount(s.amount)} KJC
+          </div>
+        `;
+      }
+
+      for (let i = 0; i < oldCount; i++) {
+        const s = await staking.methods.stakesOld(account, i).call();
+        html += `
+          <div class="stake-box">
+            <div class="stake-title">OLD Stake ${i}</div>
+            Amount: ${formatAmount(s.amount)} KJC
+          </div>
+        `;
+      }
+
+      document.getElementById("stakes").innerHTML = html || "No stake";
+    }
+
+    window.addEventListener("load", async () => {
+      try {
+        provider = pickProvider();
+        if (!provider?.request) return;
+
+        await initContracts();
+
+        const accounts = await provider.request({ method: "eth_accounts" });
+        if (accounts?.length) {
+          account = accounts[0];
+          await ensureChain();
+          await initContracts();
+          setWallet("✅ Connected<br>" + account, true);
+          await loadData();
+        }
+      } catch (e) {
+        console.error("autoload error:", e);
+      }
+    });
+
+    document.getElementById("connectBtn").onclick = connectWallet;
+    document.getElementById("approveBtn").onclick = approve;
+    document.getElementById("stakeBtn").onclick = stake;
+  </script>
+</body>
+</html>
